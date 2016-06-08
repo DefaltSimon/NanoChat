@@ -1,6 +1,6 @@
 """Nano Python Server"""
 
-__version__ = "0.2"
+__version__ = "0.3"
 __author__ = "DefaltSimon"
 
 import socket,sys,threading
@@ -16,6 +16,8 @@ sys.excepthook = excepthook
 hostd, portd = "",420
 
 def gotmsg(user,content):
+    if not content:
+        content = None
     print("Message from " + user + ": " + str(content))
 
 class PythonChat:
@@ -42,7 +44,10 @@ class PythonChat:
             anotherthread.daemon = True
             anotherthread.start()
     def waitformsg(self,conn1, addr1):
-        msg = bytes(conn1.recv(4096)).decode("utf-8")
+        try:
+            msg = bytes(conn1.recv(4096)).decode("utf-8")
+        except ConnectionResetError:
+            print(str(addr1[0]) + " disconnected.")
         gotmsg(self.users.get(addr1[0])[1],msg)
     def connect(self,ip,port):
         self.sock.connect((ip,int(port)))

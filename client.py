@@ -1,6 +1,6 @@
 """Nano Python Client"""
 
-__version__ = "0.2"
+__version__ = "0.3"
 __author__ = "DefaltSimon"
 
 import socket,sys
@@ -23,6 +23,8 @@ class PythonChat:
             self.connected.append(ip)
         except ConnectionRefusedError:
             print("Client refused to connect.")
+        except OSError:
+            print("Cannot connect twice!")
     def closesocket(self):
         self.sock.close()
     def sendmsg(self,msg):
@@ -64,27 +66,34 @@ def start():
         option = input(">")
 
         if option == "help":
-            print("Commands: connect, send, stop")
+            print("Commands: connect, send, close, chat, stop")
 
-        elif str(option).startswith("connect"):
+        elif option == "connect" or option == "cn":
             if closed is True:
                 del chat
                 chat = PythonChat()
-            if chat.connected is not []:
+            if chat.connected:
                 print("You are already connected to one client. This version does not support multiple client connections.")
-            ip = input("Host:")
-            port = input("Port (default 420):")
-            if ip in chat.connected:
-                print("You are already connected to this client.")
-                continue
-            chat.connect(ip,int(port))
+            try:
+                ip = input("Host:")
+                if not ip:
+                    ip = "localhost"
+                port = input("Port (default 420):")
+                if not port:
+                    port = 420
+                if ip in chat.connected:
+                    print("You are already connected to this ip.")
+                    continue
+                chat.connect(ip,int(port))
+            except ValueError:
+                print("Incorrect input")
             resp = bytes(chat.getdata()).decode("utf-8")
 
-            if resp.startswith("Nano Server") and resp.endswith("OK"):
-                validresp = "Valid"
-            else:
-                validresp = "Not valid"
-
+            #if resp.startswith("Nano Server") and resp.endswith("OK"):
+            #    validresp = "Valid"
+            #else:
+            #    validresp = "Not valid"
+            #
             #print("Response: " + resp + " (" + str(validresp) + ")")
             print("Connected to " + str(ip))
 
@@ -93,6 +102,9 @@ def start():
             closed = True
             chat.connected = []
             print("Closed the connection.")
+
+        elif option == "connections":
+            print(chat.connected)
 
         elif option == "stop":
             print("Disconnecting from servers...")
