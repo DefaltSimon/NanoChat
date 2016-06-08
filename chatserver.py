@@ -1,6 +1,6 @@
 """Nano Python Server"""
 
-__version__ = "0.3"
+__version__ = "0.3.1"
 __author__ = "DefaltSimon"
 
 import socket,sys,threading
@@ -36,19 +36,25 @@ class PythonChat:
             conn, addr = self.sock.accept()
             self.wasconnected.append(str(addr[0]))
             conn.send("Nano Server 0.1 OK".encode("utf-8"))
-
-            currentuser = str(self.users.get(addr[0])[1])
+            try:
+                currentuser = str(self.users.get(addr[0])[1])
+            except TypeError:
+                currentuser = "no user defined"
             print("Connected from " + str(addr[0]) + " (" + currentuser + ")")
 
             anotherthread = threading.Thread(target=self.waitformsg,args=[conn,addr])
             anotherthread.daemon = True
             anotherthread.start()
     def waitformsg(self,conn1, addr1):
+        msg = None
         try:
             msg = bytes(conn1.recv(4096)).decode("utf-8")
         except ConnectionResetError:
             print(str(addr1[0]) + " disconnected.")
-        gotmsg(self.users.get(addr1[0])[1],msg)
+        try:
+            gotmsg(self.users.get(addr1[0])[1],msg)
+        except TypeError:
+            gotmsg("somebody",msg)
     def connect(self,ip,port):
         self.sock.connect((ip,int(port)))
     def closesocket(self):
@@ -58,20 +64,25 @@ class PythonChat:
         data = conn.recv(4096)
         print(data)
 
+
+users = None
 print("Nano Chat Server " + __version__ + "\n------------------------")
+try:
+    with open("friends.txt","r") as file:
+        file = file.readlines()
+        users = {}
+        for c, line in enumerate(file):
+            if line.startswith("#"):
+                continue
 
-with open("friends.txt","r") as file:
-    file = file.readlines()
-    users = {}
-    for c, line in enumerate(file):
-        if line.startswith("#"):
-            continue
-
-        thing = line.strip("\n").split("::")
-        host1 = thing[0]
-        port1 = thing[1]
-        alias = thing[2]
-        users[host1] = [port1, alias]
+            thing = line.strip("\n").split("::")
+            host1 = thing[0]
+            port1 = thing[1]
+            alias = thing[2]
+            users[host1] = [port1, alias]
+except IndexError:
+    print("Error while parsing friends.txt, quiting.")
+    exit()
 
 chat = PythonChat(hostd,portd,users)
 
