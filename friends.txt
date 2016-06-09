@@ -1,5 +1,0 @@
-# Default server port is 420
-# Make sure you set up this file if you want to use aliases
-# First the IP, then port, then alias for this IP
-localhost::420::me
-127.0.0.1::420::me

@@ -1,3 +1,8 @@
 # NanoChat
 A simple socket chat written in python  
-Current version supports multiple connections to one server but not from one client.
+
+#### Instructions
+
+1. nanoclient.py acts as a normal client that can connect to the main server which then forwards messages to their recipients.  
+  
+2. nanoserver.py is a server to which multiple clients can connect to talk to each other
