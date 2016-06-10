@@ -1,17 +1,20 @@
 """Nano Python Client"""
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 __author__ = "DefaltSimon"
 
 import socket,sys,json,threading,time
 
 hostm, portm = "",421
 
+# Outgoing port is usually 420
+# However, incoming is 421
+
 listenerlock = False
 
 def excepthook(exctype, value, traceback):
     if exctype == ConnectionResetError:
-        print("Client disconnected.")
+        print("Connection to server could not be established.")
         return
     else:
         sys.__excepthook__(exctype, value, traceback)
@@ -23,7 +26,8 @@ class PythonChat:
         self.connected = []
         self.username = ""
 
-        self.listenerlock = False
+        self.connectiontest = False
+        self.connectiontime = 0
     def setusername(self,username):
         self.username = str(username)
     def connect(self,ip,port):
@@ -34,9 +38,11 @@ class PythonChat:
             self.connected.append(ip)
         except ConnectionRefusedError:
             print("Client refused to connect.")
-        #except OSError:
-        #    print("Cannot connect twice!")
     def closesocket(self):
+        raw = ({"type":"disconnect","username":self.username})
+        senc = json.dumps(raw).encode("utf-8")
+        self.sock.send(senc)
+        time.sleep(0.1)
         self.sock.close()
     def listener(self):
         print("started")
@@ -46,7 +52,7 @@ class PythonChat:
         sock2.setblocking(1)
 
         sock2.bind((hostm, portm))
-        sock2.listen()
+        sock2.listen(3)
 
         while True:
             conn, addr = sock2.accept()
@@ -61,9 +67,17 @@ class PythonChat:
                 print("Message from " + author +": " + content)
             elif msgtype == "clients":
                 clients = data["content"]
-                print("Clients connected to main server: " + str(clients))
-                global listenerlock
-                listenerlock = False
+                compiledclients = ""
+                for item in clients.items():
+                    compiledclients  += item[0] + " : " + item[1]
+                    compiledclients += "\n"
+
+                print("Clients connected to main server: \n" + str(compiledclients))
+            elif msgtype == "connectiontest":
+                if data["content"] == "ok":
+                    self.connectiontest = True
+                else:
+                    self.connectiontest = True
     def sendmsg(self,loc,msg):
         raw = ({"type":"msg","content":str(msg),"username":self.username,"sendto":str(loc)})
         senc = json.dumps(raw).encode("utf-8")
@@ -73,8 +87,26 @@ class PythonChat:
         senc = json.dumps(raw).encode("utf-8")
         self.sock.send(senc)
         # listener catches the answer
-        global listenerlock
-        listenerlock = True
+
+    def testconnection(self):
+        raw = ({"type":"connectiontest","username":self.username})
+        senc = json.dumps(raw).encode("utf-8")
+        self.sock.send(senc)
+
+        tries = 5
+        count = 1
+        print("Testing..",end="")
+        while tries != 0:
+            if self.connectiontest is not False:
+                print("connection ok")
+                self.connectiontest = False
+                return
+            else:
+                print(".",end="")
+            count += 1
+            time.sleep(0.2)
+        print("no connection")
+
     def getdata(self):
         try:
             data = self.sock.recv(4096)
@@ -85,7 +117,6 @@ class PythonChat:
 def start():
 
     closed = False
-    validresp = None
     print("Nano Chat " + __version__ + "\n------------------")
 
     chat = PythonChat()
@@ -103,7 +134,11 @@ def start():
         option = input(">")
 
         if option == "help":
-            print("Commands: connect, connections, clients, close, chat, stop")
+            print("Commands: connect, connections, clients, close, chat, test, stop")
+
+        elif option == "aliases":
+            aliases = "Aliases: connect - 'cn', chat - 'c', clients - 'users'"
+            print(aliases)
 
         elif option == "connect" or option == "cn":
             if closed is True:
@@ -112,6 +147,7 @@ def start():
                 chat.setusername(username)
             if chat.connected:
                 print("You are already connected to one server. Current version does not support multiple client-to-server connections.")
+                continue
             ip = None
             try:
                 ip = input("Host:")
@@ -126,12 +162,13 @@ def start():
                 chat.connect(ip,int(port))
             except ValueError:
                 print("Incorrect input")
+                continue
             try:
                 resp = bytes(chat.getdata()).decode("utf-8")
                 if resp.startswith("Nano Server") and resp.endswith("OK"):
                     validresp = "ok response"
                 else:
-                    validresp = "not ok response?!"
+                    validresp = "incorrect response?!"
                 print("Connected to " + str(ip) + " (" + validresp + ")")
             except:
                 print("No data in response.")
@@ -139,29 +176,51 @@ def start():
             #print("Response: " + resp + " (" + str(validresp) + ")")
 
         elif option == "close":
+            if not chat.connected:
+                print("You are not connected to a server. Use 'connect' to connect to a server")
+                continue
             chat.closesocket()
             closed = True
+            print("Closed the connection to " + chat.connected[0])
             chat.connected = []
-            print("Closed the connection.")
 
         elif option == "connections":
-            print(chat.connected)
+            if not chat.connected:
+                print("You are not connected to a server. Use 'connect' to connect to a server")
+                continue
+            clients = chat.connected[0]
+            print(clients)
+
+        elif option == "test" or option == "test connections":
+            if not chat.connected:
+                print("You are not connected to a server. Use 'connect' to connect to a server")
+                continue
+            chat.testconnection()
+
+            time.sleep(0.2)
 
         elif option == "clients" or option == "users":
+            if not chat.connected:
+                print("You are not connected to a server. Use 'connect' to connect to a server")
+                continue
             chat.getclients()
 
             time.sleep(0.2)
 
         elif option == "stop":
-            print("Disconnecting from servers...")
+            print("Disconnecting from servers...",end="")
             chat.closesocket()
-            print("Done. Bye!")
+            print("done. Cya!")
             exit()
 
         elif str(option).startswith("chat") or str(option) == "c":
             #if str(option)[len("chat"):] != "":
             #    msg = str(option)[len("chat")+1:]
             #else:
+
+            if not chat.connected:
+                print("You are not connected to a server. Use 'connect' to connect to a server")
+                continue
             msg = input("Message:")
             loca = input("Send to:")
             chat.sendmsg(loca,msg)

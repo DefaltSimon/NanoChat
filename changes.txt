@@ -1,0 +1,10 @@
+0.3.3
+- Fixed bugs
+- Added exceptions
+- Stylized responses
+- Stuff
+
+0.3.2
+- friends.txt has been removed (useless)
+- files have been renamed
+- pretty much a whole new system (featuring a "master server")
