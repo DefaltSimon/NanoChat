@@ -1,20 +1,25 @@
 """Nano Python Client"""
 
-__version__ = "0.3.3"
+__version__ = "0.3.4"
 __author__ = "DefaltSimon"
 
 import socket,sys,json,threading,time
 
 hostm, portm = "",421
 
-# Outgoing port is usually 420
-# However, incoming is 421
+# Outgoing port is usually 420 (server default)
+# Incoming is 421
 
 listenerlock = False
+isclosing = False
 
 def excepthook(exctype, value, traceback):
     if exctype == ConnectionResetError:
-        print("Connection to server could not be established.")
+        global isclosing
+        if not isclosing:
+            print("Connection to server could not be established or was closed.")
+        else:
+            isclosing = False
         return
     else:
         sys.__excepthook__(exctype, value, traceback)
@@ -23,22 +28,34 @@ sys.excepthook = excepthook
 class PythonChat:
     def __init__(self):
         self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        self.connected = []
+        self.connected = ""
+        self.servername = ""
         self.username = ""
 
         self.connectiontest = False
         self.connectiontime = 0
+
+        self.passwordcorrect = False
     def setusername(self,username):
         self.username = str(username)
     def connect(self,ip,port):
         try:
-            self.sock.connect((ip,port))
+            self.sock.settimeout(2)
+            try:
+                self.sock.connect((ip,port))
+            except OSError:
+                print("Server could not be reached.")
+                return False
             araw = ({"type":"initial","username":self.username})
             self.sock.send(json.dumps(araw).encode("utf-8"))
-            self.connected.append(ip)
+            self.connected = str(ip)
+            return True
         except ConnectionRefusedError:
             print("Client refused to connect.")
+            return False
     def closesocket(self):
+        global isclosing
+        isclosing = True
         raw = ({"type":"disconnect","username":self.username})
         senc = json.dumps(raw).encode("utf-8")
         self.sock.send(senc)
@@ -72,14 +89,23 @@ class PythonChat:
                     compiledclients  += item[0] + " : " + item[1]
                     compiledclients += "\n"
 
-                print("Clients connected to main server: \n" + str(compiledclients))
+                print("Clients connected to main server: \n" + str(compiledclients).strip("\n"))
             elif msgtype == "connectiontest":
                 if data["content"] == "ok":
                     self.connectiontest = True
                 else:
                     self.connectiontest = True
+            elif msgtype == "passwordresponse":
+                if data["wascorrect"]:
+                    self.passwordcorrect = True
+                else:
+                    self.passwordcorrect = False
     def sendmsg(self,loc,msg):
         raw = ({"type":"msg","content":str(msg),"username":self.username,"sendto":str(loc)})
+        senc = json.dumps(raw).encode("utf-8")
+        self.sock.send(senc)
+    def sendpass(self,passw):
+        raw = ({"type":"password","content":str(passw),"username":self.username})
         senc = json.dumps(raw).encode("utf-8")
         self.sock.send(senc)
     def getclients(self):
@@ -108,8 +134,10 @@ class PythonChat:
         print("no connection")
 
     def getdata(self):
+        if not self.connected:
+            return
         try:
-            data = self.sock.recv(4096)
+            data = json.loads(bytes(self.sock.recv(4096)).decode("utf-8"))
             return data
         except OSError:
             print("Socket not connected, OSError.")
@@ -159,17 +187,44 @@ def start():
                 if ip in chat.connected:
                     print("You are already connected to this ip.")
                     continue
-                chat.connect(ip,int(port))
+                eins = chat.connect(ip,int(port))
+                if not eins:
+                    print("quitting")
+                    continue
             except ValueError:
                 print("Incorrect input")
                 continue
             try:
-                resp = bytes(chat.getdata()).decode("utf-8")
-                if resp.startswith("Nano Server") and resp.endswith("OK"):
-                    validresp = "ok response"
+                resp = chat.getdata()
+                chat.servername = resp["servername"]
+                try:
+                    passwn = bool(resp["password"] == "required")
+                except KeyError:
+                    passwn = False
+                if passwn:
+                    password = input("Password: ")
+                    chat.sendpass(password)
+                    c = 5
+                    isk = False
+                    while c >= 0:
+                        if chat.passwordcorrect:
+                            print("Correct!")
+                            isk = True
+                            break
+                        else:
+                            time.sleep(0.1)
+                            c -= 1
                 else:
-                    validresp = "incorrect response?!"
-                print("Connected to " + str(ip) + " (" + validresp + ")")
+                    isk = True
+                if isk:
+                    if resp["code"] == "OK":
+                        validresp = "ok response"
+                    else:
+                        validresp = "incorrect response?!"
+                    print("Connected to " + str(ip) + " (" + chat.servername + ")..." + validresp)
+                else:
+                    print("Incorrect password, try again")
+                    continue
             except:
                 print("No data in response.")
 
@@ -181,15 +236,16 @@ def start():
                 continue
             chat.closesocket()
             closed = True
-            print("Closed the connection to " + chat.connected[0])
+            print(chat.connected)
+            print("Closed the connection to " + chat.connected)
             chat.connected = []
 
         elif option == "connections":
             if not chat.connected:
                 print("You are not connected to a server. Use 'connect' to connect to a server")
                 continue
-            clients = chat.connected[0]
-            print(clients)
+            clients = chat.connected
+            print(clients + " ({})".format(chat.servername))
 
         elif option == "test" or option == "test connections":
             if not chat.connected:

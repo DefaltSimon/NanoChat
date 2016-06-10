@@ -1,3 +1,8 @@
+0.3.4
+- Added password system
+- Added server naming system
+- Bugs fixed
+
 0.3.3
 - Fixed bugs
 - Added exceptions
