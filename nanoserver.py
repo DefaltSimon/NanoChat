@@ -1,6 +1,6 @@
 """Nano Python Server"""
 
-__version__ = "0.3.4"
+__version__ = "0.3.5"
 __author__ = "DefaltSimon"
 
 import socket,sys,threading,json,configparser
@@ -67,9 +67,15 @@ class PythonChat:
                 continue
 
             if self.password:
-                raw = ({"type": "initialresponse","code":"OK","servername":self.servername,"password":"required"})
+                raw = {
+                    "type": "initialresponse",
+                    "code":"OK","servername":self.servername,
+                    "password":"required"
+                }
             else:
-                raw = ({"type": "initialresponse","code":"OK","servername":self.servername})
+                raw = {"type": "initialresponse",
+                       "code":"OK","servername":self.servername
+                       }
             senc = json.dumps(raw).encode("utf-8")
             #conn.send("Nano Server 0.1 OK".encode("utf-8"))
             conn.send(senc)
@@ -78,7 +84,7 @@ class PythonChat:
             except TypeError:
                 currentuser = "error"
             if self.password:
-                print("Reuqesting password from " + str(addr[0]) + " (" + initial["username"] + ")")
+                print("Requesting password from " + str(addr[0]) + " (" + initial["username"] + ")")
             else:
                 print("Connected from " + str(addr[0]) + " (" + currentuser + ")")
             anotherthread = threading.Thread(target=self.waitformsg,args=[conn,addr])
@@ -106,14 +112,20 @@ class PythonChat:
                     sock2.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
                     sock2.setblocking(1)
 
+                    sock3 = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+                    sock3.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
+                    sock3.setblocking(1)
+
                     if demsg["type"] == "getclients":
                         sock2.connect((addr1[0],defclientportd))
-                        raw = json.dumps({"type":"clients","content":self.users}).encode("utf-8")
+                        raw = json.dumps({"type":"clients",
+                                          "content":self.users}).encode("utf-8")
                         sock2.send(raw)
                         clientsrequested(demsg["username"])
                     elif demsg["type"] == "connectiontest":
                         sock2.connect((addr1[0],defclientportd))
-                        raw = ({"type":"connectiontest","content":"ok"})
+                        raw = ({"type":"connectiontest",
+                                "content":"ok"})
                         senc = json.dumps(raw).encode("utf-8")
                         sock2.send(senc)
                         print("{} tested connection.".format(demsg["username"]))
@@ -125,15 +137,20 @@ class PythonChat:
                         if self.pending[addr1[0]] == username1:
                             # Password check
                             if self.password == demsg["content"]:
-                                raw = ({"type":"passwordresponse","wascorrect":True})
+                                raw = {"type":"passwordresponse",
+                                       "wascorrect":True
+                                       }
 
                                 self.users[str(addr1[0])] = username1
                                 self.ips[username1] = str(addr1[0])
                                 shouldquit = False
                                 print("Connected from " + str(addr1[0]) + " (" + username1 + ")")
                             else:
-                                raw = ({"type":"passwordresponse","wascorrect":False})
+                                raw = {"type":"passwordresponse",
+                                       "wascorrect":False
+                                       }
                                 shouldquit = True
+                                print(str(addr1[0]) + " (" + username1 + ") failed to connect: password incorrect")
 
                             senc = json.dumps(raw).encode("utf-8")
                             sock2.connect((addr1[0],defclientportd))
@@ -147,9 +164,26 @@ class PythonChat:
                             gotmsg(self.users.get(addr1[0]),demsg["content"],demsg["sendto"])
                         except TypeError:
                             gotmsg("somebody",demsg["content"],demsg["sendto"])
-                        sock2.connect((self.ips.get(str(demsg["sendto"])),defclientportd))
-                        raw = json.dumps({"type":"msg","from":str(demsg["username"]),"content":str(demsg["content"])}).encode("utf-8")
-                        sock2.send(raw)
+
+                        ipadd = self.ips.get(str(demsg["sendto"]))
+                        if ipadd is None:
+                            sock2.connect((addr1[0],defclientportd))
+                            raw = json.dumps({"type":"failedmsg",
+                                              "failedto":demsg["sendto"],
+                                              "reason":"No user with that name"}).encode("utf-8")
+                            sock2.send(raw)
+                        else:
+                            sock3.connect((addr1[0],defclientportd))
+                            raw = json.dumps({"type":"successfulmsg"}).encode("utf-8")
+                            sock3.send(raw)
+
+                            sock2.connect((ipadd,defclientportd))
+                            raw = json.dumps({"type":"msg",
+                                              "from":str(demsg["username"]),
+                                              "content":str(demsg["content"])}).encode("utf-8")
+                            sock2.send(raw)
+
+
             except ConnectionResetError:
                 print("{} ({}) disconnected.".format(str(addr1[0]),str(self.users[addr1[0]])))
                 self.users.pop(str(addr1[0]))
@@ -161,7 +195,8 @@ class PythonChat:
         data = conn.recv(4096)
         print(data)
 
-print("Nano Chat Server " + __version__ + "\n-------------------------")
+length = len("Nano Chat Server "  + __version__)
+print("Nano Chat Server" + __version__ + "\n" + str( "-" * length))
 
 # todo Feature: autoconnect from a text file?
 #try:
@@ -196,8 +231,8 @@ if usename:
     chat.setservername(servernam)
     print("Server name: " + str(servernam))
 else:
-    servername = input("Server name: ")
-    chat.setservername(str(servername))
-print("-------------------------")
+    servernam = input("Server name: ")
+    chat.setservername(str(servernam))
+print(str( "-" * len("Server Name: " + str(servernam))))
 
 chat.waitforfirstconn()
