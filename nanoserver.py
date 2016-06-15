@@ -1,6 +1,6 @@
 """Nano Python Server"""
 
-__version__ = "0.3.5"
+__version__ = "0.3.6dev"
 __author__ = "DefaltSimon"
 
 import socket,sys,threading,json,configparser
@@ -131,7 +131,10 @@ class PythonChat:
                         print("{} tested connection.".format(demsg["username"]))
                     elif demsg["type"] == "disconnect":
                         print("{} ({})  disconnected.".format(str(addr1[0]),str(self.users[addr1[0]])))
-                        self.users.pop(str(addr1[0]))
+                        try:
+                            self.users.pop(str(addr1[0]))
+                        except KeyError:
+                            pass
                         return
                     elif demsg["type"] == "password":
                         if self.pending[addr1[0]] == username1:
@@ -185,8 +188,15 @@ class PythonChat:
 
 
             except ConnectionResetError:
-                print("{} ({}) disconnected.".format(str(addr1[0]),str(self.users[addr1[0]])))
-                self.users.pop(str(addr1[0]))
+                try:
+                    usern = str(self.users[addr1[0]])
+                except KeyError:
+                    usern = "None"
+                print("{} ({}) disconnected.".format(str(addr1[0]),usern))
+                try:
+                    self.users.pop(str(addr1[0]))
+                except KeyError:
+                    pass
                 return
     def closesocket(self):
         self.sock.close()
