@@ -5,4 +5,10 @@ A simple socket chat written in python
 
 1. nanoclient.py acts as a normal client that can connect to the main server which then forwards messages to their recipients.  
   
-2. nanoserver.py is a server to which multiple clients can connect to talk to each other
+2. nanoserver.py is a server to which multiple clients can connect to talk to each other  
+  
+#### Features
+- server names and client usernames
+- server password
+- online users listing
+- more...
