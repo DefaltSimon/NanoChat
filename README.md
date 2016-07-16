@@ -11,4 +11,5 @@ A simple socket chat written in python
 - server names and client usernames
 - server password
 - online users listing
-- more...
+- encryption
+- ...
