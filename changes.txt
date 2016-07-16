@@ -1,3 +1,7 @@
+0.4
+- Bugfixes and optimizations
+- Added AES encryption (requires pycrypto)
+
 0.3.6
 - Fixed KeyError when connecting with two clients at the same time on the same ip
 - Fixed and covered some exceptions and smaller bugs
